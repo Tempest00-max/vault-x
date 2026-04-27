@@ -1,33 +1,27 @@
 import os
+import io
+import time
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from security import encrypt_file, decrypt_file
-import io
 
 app = FastAPI()
 
-# --- THE HANDSHAKE (CORS) ---
-# This allows your GitHub site to talk to your Railway server
-origins = [
-    "http://localhost",
-    "http://127.0.0.1:8000",
-    "https://tempest00-max.github.io", # Your live frontend
-]
+# --- RED TEAM HARDENING: STRICT CORS ---
+# Only allow your specific GitHub Pages domain
+origins = ["https://tempest00-max.github.io"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["POST"], 
     allow_headers=["*"],
 )
 
-@app.get("/")
-async def root():
-    return {"status": "Vault-X2 Engine Active", "mode": "Obsidian"}
-
-# --- THE BINARY ENGINE ---
+# Basic Rate Limiting to prevent brute-force attacks
+request_history = {}
 
 @app.post("/process-file")
 async def process_file(
@@ -35,32 +29,32 @@ async def process_file(
     password: str = Form(...), 
     mode: str = Form(...)
 ):
+    # Rate Limiting Logic
+    client_ip = "global_user" 
+    now = time.time()
+    if client_ip in request_history and now - request_history[client_ip] < 2:
+        raise HTTPException(status_code=429, detail="RATE_LIMIT_EXCEEDED")
+    request_history[client_ip] = now
+
     try:
-        # Read the file into memory (Streaming small to medium files)
-        file_data = await file.read()
+        content = await file.read()
         
         if mode == "encrypt":
-            processed_data = encrypt_file(file_data, password)
-            filename = f"{file.filename}.vx2"
-        elif mode == "decrypt":
-            processed_data = decrypt_file(file_data, password)
-            # Remove .vx2 extension if it exists
-            filename = file.filename.replace(".vx2", "")
+            result = encrypt_file(content, password)
+            out_name = f"{file.filename}.vx2"
         else:
-            raise HTTPException(status_code=400, detail="Invalid Mode")
+            result = decrypt_file(content, password)
+            out_name = file.filename.replace(".vx2", "")
 
-        # Stream the file back to the user's browser
         return StreamingResponse(
-            io.BytesIO(processed_data),
+            io.BytesIO(result),
             media_type="application/octet-stream",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            headers={"Content-Disposition": f"attachment; filename={out_name}"}
         )
-
-    except Exception as e:
-        # If decryption fails (wrong password), send a 401
-        raise HTTPException(status_code=401, detail=str(e))
+    except Exception:
+        # Prevent "Side-Channel" leaks by using a generic error
+        raise HTTPException(status_code=401, detail="AUTHENTICATION_FAILED")
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))

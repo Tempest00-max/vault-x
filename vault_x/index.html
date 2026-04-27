@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VAULT-X2 | Solaris Mobile</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;500;800&display=swap');
+
+        :root {
+            --primary: #00f2fe;
+            --secondary: #4facfe;
+            --bg: #f8fafc;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--bg);
+            color: #1e293b;
+            overflow-x: hidden;
+            /* Prevents "pull-to-refresh" on some mobile browsers while using the app */
+            overscroll-behavior-y: contain;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.05);
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .btn-gradient {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            transition: all 0.3s ease;
+        }
+
+        .btn-purple {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            transition: all 0.3s ease;
+        }
+
+        /* Mobile-friendly active states (replaces hover for touch) */
+        .btn-gradient:active,
+        .btn-purple:active {
+            transform: scale(0.96);
+            opacity: 0.9;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0px);
+            }
+
+            50% {
+                transform: translateY(-20px);
+            }
+        }
+
+        .floating-blob {
+            position: absolute;
+            width: 300px;
+            /* Smaller blobs for mobile */
+            height: 300px;
+            filter: blur(60px);
+            z-index: -1;
+            animation: float 10s infinite ease-in-out;
+            opacity: 0.3;
+        }
+
+        @media (min-width: 768px) {
+            .floating-blob {
+                width: 500px;
+                height: 500px;
+                filter: blur(80px);
+            }
+        }
+
+        #dropZone {
+            touch-action: manipulation;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex items-center justify-center p-4 md:p-6 relative">
+
+    <div class="floating-blob top-[-5%] left-[-10%]" style="background: #4facfe;"></div>
+    <div class="floating-blob bottom-[-5%] right-[-10%]" style="background: #f093fb; animation-delay: -5s;"></div>
+
+    <div class="glass w-full max-w-xl rounded-[32px] md:rounded-[40px] p-6 md:p-14 z-10">
+        <div class="text-center mb-8 md:mb-12">
+            <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight mb-2 gradient-text">VAULT-X2</h1>
+            <p class="text-[10px] font-bold tracking-[0.3em] text-slate-400 uppercase">Mobile Secure Stream</p>
+        </div>
+
+        <div id="dropZone"
+            class="relative group mb-8 border-2 border-dashed border-slate-200 rounded-[24px] md:rounded-[30px] p-10 md:p-16 text-center transition-all cursor-pointer bg-white/40 active:bg-cyan-50/50">
+            <div class="mb-4 flex justify-center">
+                <svg class="w-8 h-8 md:w-10 md:h-10 text-cyan-500" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+            </div>
+            <p id="fileNameDisplay" class="text-sm md:text-lg font-bold text-slate-700">Tap to select file</p>
+            <input type="file" id="fileInput" class="hidden">
+        </div>
+
+        <div class="space-y-6 md:space-y-8">
+            <input type="password" id="passwordInput" placeholder="Master Cipher"
+                class="w-full bg-white border border-slate-100 rounded-xl md:rounded-2xl px-5 py-4 md:py-5 outline-none focus:ring-4 focus:ring-cyan-100 transition-all text-center text-base md:text-lg font-medium shadow-sm">
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button onclick="processStream('encrypt')"
+                    class="btn-gradient py-4 md:py-5 rounded-xl md:rounded-2xl text-white text-[10px] font-black uppercase tracking-widest shadow-md">Encrypt</button>
+                <button onclick="processStream('decrypt')"
+                    class="btn-purple py-4 md:py-5 rounded-xl md:rounded-2xl text-white text-[10px] font-black uppercase tracking-widest shadow-md">Decrypt</button>
+            </div>
+        </div>
+
+        <div id="sessionHistory"
+            class="mt-8 md:mt-10 bg-slate-50/50 rounded-xl p-4 h-20 md:h-24 overflow-y-auto text-[10px] font-mono text-slate-400 space-y-1 border border-slate-100">
+            <p>> HANDSHAKE_READY...</p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "https://vault-x-production-efdb.up.railway.app";
+        let selectedFile = null;
+
+        function handleFile(files) {
+            const file = files || files;
+            if (!file || !(file instanceof File)) return;
+            selectedFile = file;
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+            document.getElementById('fileNameDisplay').innerText = `${file.name.toUpperCase()} [${sizeMB}MB]`;
+            logAction(`STAGED: ${file.name}`);
+        }
+
+        document.getElementById('dropZone').addEventListener('click', () => document.getElementById('fileInput').click());
+        document.getElementById('fileInput').addEventListener('change', (e) => handleFile(e.target.files));
+
+        async function processStream(mode) {
+            const password = document.getElementById('passwordInput').value;
+            if (!selectedFile || !password) { logAction("DATA_REQUIRED", "text-red-400"); return; }
+
+            logAction(`STREAMING_TO_CLOUD...`);
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('password', password);
+            formData.append('mode', mode);
+
+            try {
+                const res = await fetch(`${API_BASE}/process-file`, { method: 'POST', body: formData });
+                if (!res.ok) throw new Error("AUTH_FAILED");
+
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = mode === 'encrypt' ? `${selectedFile.name}.vx2` : selectedFile.name.replace('.vx2', '');
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                logAction("COMPLETE", "text-cyan-500");
+            } catch (err) {
+                logAction("ERROR: CHECK_CIPHER", "text-red-400");
+            }
+        }
+
+        function logAction(msg, cls = "") {
+            const p = document.createElement('p'); p.className = cls; p.innerText = `> ${msg}`;
+            document.getElementById('sessionHistory').prepend(p);
+        }
+    </script>
+</body>
+
+</html>
