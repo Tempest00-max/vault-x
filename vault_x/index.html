@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VAULT-X2 | Solaris Elite</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;500;800&display=swap');
+
+        :root {
+            --primary: #00f2fe;
+            --secondary: #4facfe;
+            --bg: #f8fafc;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--bg);
+            color: #1e293b;
+            overflow-x: hidden;
+            touch-action: pan-y;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.05);
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .btn-gradient {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            transition: all 0.3s ease;
+        }
+
+        .btn-purple {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            transition: all 0.3s ease;
+        }
+
+        .btn-gradient:active,
+        .btn-purple:active {
+            transform: scale(0.96);
+            opacity: 0.9;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0px);
+            }
+
+            50% {
+                transform: translateY(-20px);
+            }
+        }
+
+        .floating-blob {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            filter: blur(60px);
+            z-index: -1;
+            animation: float 10s infinite ease-in-out;
+            opacity: 0.3;
+        }
+
+        @media (min-width: 768px) {
+            .floating-blob {
+                width: 500px;
+                height: 500px;
+                filter: blur(80px);
+            }
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex items-center justify-center p-4 md:p-6 relative">
+
+    <div class="floating-blob top-[-5%] left-[-10%]" style="background: #4facfe;"></div>
+    <div class="floating-blob bottom-[-5%] right-[-10%]" style="background: #f093fb; animation-delay: -5s;"></div>
+
+    <div class="glass w-full max-w-md rounded-[32px] p-6 md:p-10 z-10 border-white">
+        <div class="text-center mb-6 md:mb-10">
+            <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight mb-2 gradient-text">VAULT-X2</h1>
+            <p class="text-[9px] font-bold tracking-[0.3em] text-slate-400 uppercase">Secure Neural Gateway</p>
+        </div>
+
+        <div id="dropZone"
+            class="relative group mb-6 border-2 border-dashed border-slate-100 rounded-[24px] p-8 md:p-12 text-center transition-all cursor-pointer bg-white/40 active:bg-cyan-50/20">
+            <div class="mb-4 flex justify-center">
+                <div class="p-3 bg-cyan-50/50 rounded-xl">
+                    <svg class="w-8 h-8 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                </div>
+            </div>
+            <p id="fileNameDisplay" class="text-sm md:text-base font-bold text-slate-700">Drop your file here</p>
+            <p class="text-[9px] text-slate-400 mt-1 font-medium">PNG, JPG, PDF, OR BINARY</p>
+            <input type="file" id="fileInput" class="hidden">
+        </div>
+
+        <div class="space-y-4 md:space-y-6">
+            <input type="password" id="passwordInput" placeholder="Enter Secure Key"
+                class="w-full bg-white border border-slate-50 rounded-xl px-5 py-4 outline-none focus:ring-4 focus:ring-cyan-50 transition-all text-center text-sm md:text-base font-medium">
+
+            <div class="flex flex-col gap-3">
+                <button onclick="processStream('encrypt')"
+                    class="btn-gradient py-4 rounded-xl text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-cyan-100">
+                    Encrypt Stream
+                </button>
+                <button onclick="processStream('decrypt')"
+                    class="btn-purple py-4 rounded-xl text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-purple-100">
+                    Decrypt Stream
+                </button>
+            </div>
+        </div>
+
+        <div id="sessionHistory"
+            class="mt-8 bg-slate-50/30 rounded-xl p-4 h-16 overflow-y-auto text-[9px] font-mono text-slate-400 space-y-1 border border-slate-50">
+            <p>> KERNEL_ACTIVE</p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "https://vault-x-production-efdb.up.railway.app";
+        let selectedFile = null;
+
+        function handleFile(files) {
+            const file = files || files;
+            if (!file || !(file instanceof File)) return;
+            selectedFile = file;
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+            document.getElementById('fileNameDisplay').innerText = `LOCKED: ${file.name.toUpperCase()} [${sizeMB}MB]`;
+            logAction(`STAGED: ${file.name}`);
+        }
+
+        document.getElementById('dropZone').addEventListener('click', () => document.getElementById('fileInput').click());
+        document.getElementById('fileInput').addEventListener('change', (e) => handleFile(e.target.files));
+
+        async function processStream(mode) {
+            const password = document.getElementById('passwordInput').value;
+            if (!selectedFile || !password) { logAction("MISSING_DATA", "text-red-400"); return; }
+            logAction(`STREAMING...`);
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('password', password);
+            formData.append('mode', mode);
+            try {
+                const res = await fetch(`${API_BASE}/process-file`, { method: 'POST', body: formData });
+                if (!res.ok) throw new Error("AUTH_DENIED");
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = mode === 'encrypt' ? `${selectedFile.name}.vx2` : selectedFile.name.replace('.vx2', '');
+                document.body.appendChild(a); a.click(); a.remove();
+                logAction("COMPLETE", "text-cyan-500");
+            } catch (err) { logAction("ACCESS_DENIED", "text-red-400"); }
+        }
+
+        function logAction(msg, cls = "") {
+            const p = document.createElement('p'); p.className = cls; p.innerText = `> ${msg}`;
+            document.getElementById('sessionHistory').prepend(p);
+        }
+    </script>
+</body>
+
+</html>
