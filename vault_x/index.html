@@ -72,20 +72,21 @@
         const fileNameDisplay = document.getElementById('fileName');
 
         fileInput.addEventListener('change', (e) => {
+            console.log("File detection triggered"); // Check console (F12)
             if (e.target.files.length > 0) {
                 selectedFile = e.target.files[0];
                 fileNameDisplay.innerText = "LOCKED: " + selectedFile.name.toUpperCase();
-                fileNameDisplay.classList.remove('text-slate-600');
-                fileNameDisplay.classList.add('text-cyan-500');
+                fileNameDisplay.style.color = "#00f2fe";
+                alert("SYSTEM: DATA STREAM CAPTURED");
             }
         });
 
         document.getElementById('encryptBtn').onclick = () => {
             if (!selectedFile) {
-                alert("CRITICAL: NO DATA LOADED");
+                alert("CRITICAL: DATA STREAM EMPTY");
                 return;
             }
-            alert("ENCRYPTING: " + selectedFile.name);
+            alert("SUCCESS: PROCESSING " + selectedFile.name);
         };
     </script>
 </body>
