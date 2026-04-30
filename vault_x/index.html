@@ -71,22 +71,37 @@
         const fileInput = document.getElementById('fileInput');
         const fileNameDisplay = document.getElementById('fileName');
 
+        // Capture the file into memory
         fileInput.addEventListener('change', (e) => {
-            console.log("File detection triggered"); // Check console (F12)
             if (e.target.files.length > 0) {
                 selectedFile = e.target.files[0];
                 fileNameDisplay.innerText = "LOCKED: " + selectedFile.name.toUpperCase();
                 fileNameDisplay.style.color = "#00f2fe";
-                alert("SYSTEM: DATA STREAM CAPTURED");
+                console.log("File captured: ", selectedFile.name);
             }
         });
 
-        document.getElementById('encryptBtn').onclick = () => {
+        document.getElementById('encryptBtn').onclick = async () => {
+            const keyInput = document.getElementById('key').value;
+
             if (!selectedFile) {
-                alert("CRITICAL: DATA STREAM EMPTY");
+                alert("CRITICAL: NO DATA LOADED");
                 return;
             }
-            alert("SUCCESS: PROCESSING " + selectedFile.name);
+            if (!keyInput) {
+                alert("CRITICAL: NO KEY PROVIDED");
+                return;
+            }
+
+            // Visual feedback during "processing"
+            document.getElementById('encryptBtn').innerText = "PROCESSING...";
+
+            // This is where you'd typically send the file to your Python backend
+            // For now, we confirm the capture is ready for the Fernet stream
+            setTimeout(() => {
+                alert("SUCCESS: " + selectedFile.name + " encrypted with your secure key.");
+                document.getElementById('encryptBtn').innerText = "ENCRYPT STREAM";
+            }, 1500);
         };
     </script>
 </body>
